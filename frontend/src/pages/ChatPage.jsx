@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useChatStore } from "../store/useChatStore";
 
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
@@ -9,27 +10,64 @@ import ChatContainer from "../components/ChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
 
 function ChatPage() {
-  const { activeTab, selectedUser } = useChatStore();
+  const { activeTab, selectedUser, showMobileSidebar } = useChatStore();
 
   return (
-    <div className="relative w-full max-w-6xl h-[800px]">
+    <motion.div
+      className="relative w-full max-w-6xl h-[100dvh] md:h-[800px]"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+    >
       <BorderAnimatedContainer>
-        {/* LEFT SIDE */}
-        <div className="w-80 bg-slate-800/50 backdrop-blur-sm flex flex-col">
+        {/* LEFT SIDE - SIDEBAR */}
+        <motion.div
+          className={`
+            ${showMobileSidebar ? 'flex' : 'hidden'} 
+            md:flex
+            w-full md:w-80 
+            bg-slate-800/50 backdrop-blur-sm 
+            flex-col
+            absolute md:relative
+            inset-0 md:inset-auto
+            z-10
+          `}
+          initial={false}
+          animate={{
+            x: showMobileSidebar ? 0 : -320,
+            opacity: showMobileSidebar ? 1 : 0
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        >
           <ProfileHeader />
           <ActiveTabSwitch />
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 hide-scrollbar">
             {activeTab === "chats" ? <ChatsList /> : <ContactList />}
           </div>
-        </div>
+        </motion.div>
 
-        {/* RIGHT SIDE */}
-        <div className="flex-1 flex flex-col bg-slate-900/50 backdrop-blur-sm">
+        {/* RIGHT SIDE - CHAT */}
+        <motion.div
+          className={`
+            ${!showMobileSidebar ? 'flex' : 'hidden'} 
+            md:flex
+            flex-1 flex-col 
+            bg-slate-900/50 backdrop-blur-sm
+            w-full
+          `}
+          initial={false}
+          animate={{
+            x: !showMobileSidebar ? 0 : 320,
+            opacity: !showMobileSidebar ? 1 : 0
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        >
           {selectedUser ? <ChatContainer /> : <NoConversationPlaceholder />}
-        </div>
+        </motion.div>
       </BorderAnimatedContainer>
-    </div>
+    </motion.div>
   );
 }
 export default ChatPage;

@@ -12,14 +12,23 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
   isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
+  showMobileSidebar: true, // Mobile navigation state
 
   toggleSound: () => {
     localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
     set({ isSoundEnabled: !get().isSoundEnabled });
   },
 
+  setShowMobileSidebar: (show) => set({ showMobileSidebar: show }),
+
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setSelectedUser: (selectedUser) => {
+    set({ selectedUser });
+    // On mobile, switch to chat view when user is selected
+    if (selectedUser) {
+      set({ showMobileSidebar: false });
+    }
+  },
 
   getAllContacts: async () => {
     set({ isUsersLoading: true });
