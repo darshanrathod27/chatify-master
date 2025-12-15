@@ -25,8 +25,8 @@
 </tr>
 <tr>
 <td><img src="./frontend/public/screenshot-for-readme.png" width="280" alt="Chat Interface"/></td>
-<td><img src="./frontend/public/login.png" width="280" alt="Login Page"/></td>
-<td><img src="./frontend/public/signup.png" width="280" alt="Sign Up Page"/></td>
+<td><img src="./frontend/public/login1.png" width="280" alt="Login Page"/></td>
+<td><img src="./frontend/public/signup1.png" width="280" alt="Sign Up Page"/></td>
 </tr>
 </table>
 </div>
