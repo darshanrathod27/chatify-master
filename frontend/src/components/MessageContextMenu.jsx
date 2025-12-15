@@ -73,40 +73,47 @@ function MessageContextMenu({
 
     // Calculate WhatsApp-style menu position (attached to bubble)
     useEffect(() => {
-        const menuHeight = 200;
+        const menuHeight = 220;
         const menuWidth = 150;
         const bubbleRect = position.bubbleRect;
+        const isOwn = position.isOwn !== undefined ? position.isOwn : isOwnMessage;
 
         let top, left;
 
         if (bubbleRect) {
             // WhatsApp-style: position menu next to bubble
-            if (isOwnMessage) {
-                // Own message: menu on the left of bubble
-                left = bubbleRect.left - menuWidth - 8;
-                if (left < 10) left = bubbleRect.right + 8; // Flip if no space
+            if (isOwn) {
+                // Own message (right side): menu on the left of bubble
+                left = bubbleRect.left - menuWidth - 12;
+                // If no space on left, put it on right
+                if (left < 20) {
+                    left = bubbleRect.right + 12;
+                }
             } else {
-                // Other's message: menu on the right of bubble
-                left = bubbleRect.right + 8;
-                if (left + menuWidth > window.innerWidth - 10) left = bubbleRect.left - menuWidth - 8;
+                // Other's message (left side): menu on the right of bubble
+                left = bubbleRect.right + 12;
+                // If no space on right, put it on left
+                if (left + menuWidth > window.innerWidth - 20) {
+                    left = bubbleRect.left - menuWidth - 12;
+                }
             }
 
-            // Vertically center relative to bubble
-            top = bubbleRect.top;
+            // Position vertically centered on bubble
+            top = bubbleRect.top + (bubbleRect.height / 2) - (menuHeight / 2);
         } else {
             // Fallback to click position
             left = position.x;
-            top = position.y;
+            top = position.y - menuHeight / 2;
         }
 
         // Ensure menu stays within screen bounds
         if (top + menuHeight > window.innerHeight - 20) {
             top = window.innerHeight - menuHeight - 20;
         }
-        if (top < 10) top = 10;
-        if (left < 10) left = 10;
-        if (left + menuWidth > window.innerWidth - 10) {
-            left = window.innerWidth - menuWidth - 10;
+        if (top < 20) top = 20;
+        if (left < 20) left = 20;
+        if (left + menuWidth > window.innerWidth - 20) {
+            left = window.innerWidth - menuWidth - 20;
         }
 
         setMenuPosition({ top, left });

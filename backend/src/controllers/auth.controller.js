@@ -6,7 +6,7 @@ import { ENV } from "../lib/env.js";
 import cloudinary from "../lib/cloudinary.js";
 
 export const signup = async (req, res) => {
-  const { fullName, email, password } = req.body;
+  const { fullName, email, password, profilePic } = req.body;
 
   try {
     if (!fullName || !email || !password) {
@@ -34,14 +34,10 @@ export const signup = async (req, res) => {
       fullName,
       email,
       password: hashedPassword,
+      profilePic: profilePic || "", // Save selected avatar
     });
 
     if (newUser) {
-      // before CR:
-      // generateToken(newUser._id, res);
-      // await newUser.save();
-
-      // after CR:
       // Persist user first, then issue auth cookie
       const savedUser = await newUser.save();
       generateToken(savedUser._id, res);

@@ -51,18 +51,39 @@ function ChatContainer() {
   const handleContextMenu = useCallback((e, msg) => {
     e.preventDefault();
     e.stopPropagation();
-    const bubbleRect = e.currentTarget.getBoundingClientRect();
-    setContextMenu({ message: msg, position: { x: bubbleRect.right, y: bubbleRect.top, bubbleRect } });
-  }, []);
+    // Find the bubble element (in case we clicked on a child)
+    const bubbleEl = e.currentTarget;
+    const bubbleRect = bubbleEl.getBoundingClientRect();
+    const isOwn = msg.senderId === authUser._id;
+    setContextMenu({
+      message: msg,
+      position: {
+        x: isOwn ? bubbleRect.left : bubbleRect.right,
+        y: bubbleRect.top + bubbleRect.height / 2,
+        bubbleRect,
+        isOwn
+      }
+    });
+  }, [authUser._id]);
 
   const handleTouchStart = useCallback((e, msg) => {
     touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    const bubbleRect = e.currentTarget.getBoundingClientRect();
+    const bubbleEl = e.currentTarget;
+    const bubbleRect = bubbleEl.getBoundingClientRect();
+    const isOwn = msg.senderId === authUser._id;
     longPressTimer.current = setTimeout(() => {
-      setContextMenu({ message: msg, position: { x: bubbleRect.right, y: bubbleRect.top, bubbleRect } });
+      setContextMenu({
+        message: msg,
+        position: {
+          x: isOwn ? bubbleRect.left : bubbleRect.right,
+          y: bubbleRect.top + bubbleRect.height / 2,
+          bubbleRect,
+          isOwn
+        }
+      });
       if (navigator.vibrate) navigator.vibrate(50);
     }, 400);
-  }, []);
+  }, [authUser._id]);
 
   const handleTouchMove = useCallback((e) => {
     const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
@@ -113,8 +134,8 @@ function ChatContainer() {
                     {/* Bubble */}
                     <div
                       className={`inline-block px-4 py-2.5 rounded-2xl cursor-pointer select-none shadow-md ${isOwn
-                          ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-br-sm"
-                          : "bg-slate-800 text-slate-100 border border-slate-700/50 rounded-bl-sm"
+                        ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-br-sm"
+                        : "bg-slate-800 text-slate-100 border border-slate-700/50 rounded-bl-sm"
                         }`}
                       style={{ minWidth: "60px" }}
                       onContextMenu={(e) => handleContextMenu(e, msg)}
