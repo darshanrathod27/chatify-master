@@ -93,6 +93,75 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Edit message
+  editMessage: async (messageId, newText) => {
+    const { messages } = get();
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}`, { text: newText });
+      set({
+        messages: messages.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, text: newText, isEdited: true }
+            : msg
+        ),
+      });
+      toast.success("Message edited");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to edit message");
+    }
+  },
+
+  // Delete message
+  deleteMessage: async (messageId) => {
+    const { messages } = get();
+    try {
+      await axiosInstance.delete(`/messages/${messageId}`);
+      set({ messages: messages.filter((msg) => msg._id !== messageId) });
+      toast.success("Message deleted");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete message");
+    }
+  },
+
+  // React to message
+  reactToMessage: async (messageId, emoji) => {
+    const { messages } = get();
+    const { authUser } = useAuthStore.getState();
+    try {
+      const res = await axiosInstance.post(`/messages/${messageId}/react`, { emoji });
+      set({
+        messages: messages.map((msg) =>
+          msg._id === messageId
+            ? {
+              ...msg,
+              reactions: [
+                ...(msg.reactions || []),
+                { emoji, userId: authUser._id },
+              ],
+            }
+            : msg
+        ),
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to add reaction");
+    }
+  },
+
+  // Forward message
+  forwardMessage: async (message, userIds) => {
+    try {
+      for (const userId of userIds) {
+        await axiosInstance.post(`/messages/send/${userId}`, {
+          text: message.text,
+          image: message.image,
+        });
+      }
+      toast.success(`Message forwarded to ${userIds.length} user(s)`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to forward message");
+    }
+  },
+
   subscribeToMessages: () => {
     const { selectedUser, isSoundEnabled } = get();
     if (!selectedUser) return;
@@ -113,10 +182,42 @@ export const useChatStore = create((set, get) => ({
         notificationSound.play().catch((e) => console.log("Audio play failed:", e));
       }
     });
+
+    // Listen for message edits
+    socket.on("messageEdited", ({ messageId, text }) => {
+      const currentMessages = get().messages;
+      set({
+        messages: currentMessages.map((msg) =>
+          msg._id === messageId ? { ...msg, text, isEdited: true } : msg
+        ),
+      });
+    });
+
+    // Listen for message deletes
+    socket.on("messageDeleted", ({ messageId }) => {
+      const currentMessages = get().messages;
+      set({ messages: currentMessages.filter((msg) => msg._id !== messageId) });
+    });
+
+    // Listen for reactions
+    socket.on("messageReaction", ({ messageId, reaction }) => {
+      const currentMessages = get().messages;
+      set({
+        messages: currentMessages.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, reactions: [...(msg.reactions || []), reaction] }
+            : msg
+        ),
+      });
+    });
   },
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket.off("newMessage");
+    socket.off("messageEdited");
+    socket.off("messageDeleted");
+    socket.off("messageReaction");
   },
 }));
+

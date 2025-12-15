@@ -20,6 +20,21 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    reactions: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        emoji: {
+          type: String,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -27,3 +42,4 @@ const messageSchema = new mongoose.Schema(
 const Message = mongoose.model("Message", messageSchema);
 
 export default Message;
+

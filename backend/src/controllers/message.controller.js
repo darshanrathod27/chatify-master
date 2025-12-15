@@ -79,6 +79,127 @@ export const sendMessage = async (req, res) => {
   }
 };
 
+// Edit message
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only sender can edit their message
+    if (!message.senderId.equals(userId)) {
+      return res.status(403).json({ message: "You can only edit your own messages" });
+    }
+
+    message.text = text;
+    message.isEdited = true;
+    await message.save();
+
+    // Notify the receiver in real-time
+    const receiverSocketId = getReceiverSocketId(message.receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageEdited", {
+        messageId: message._id,
+        text: message.text,
+      });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in editMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete message
+export const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Only sender can delete their message
+    if (!message.senderId.equals(userId)) {
+      return res.status(403).json({ message: "You can only delete your own messages" });
+    }
+
+    const receiverId = message.receiverId;
+    await Message.findByIdAndDelete(messageId);
+
+    // Notify the receiver in real-time
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageDeleted", { messageId });
+    }
+
+    res.status(200).json({ message: "Message deleted successfully" });
+  } catch (error) {
+    console.log("Error in deleteMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// React to message
+export const reactToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if user already reacted with this emoji
+    const existingReaction = message.reactions.find(
+      (r) => r.userId.equals(userId) && r.emoji === emoji
+    );
+
+    if (existingReaction) {
+      // Remove the reaction (toggle off)
+      message.reactions = message.reactions.filter(
+        (r) => !(r.userId.equals(userId) && r.emoji === emoji)
+      );
+    } else {
+      // Add the reaction
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+
+    // Notify both sender and receiver in real-time
+    const otherUserId = message.senderId.equals(userId)
+      ? message.receiverId
+      : message.senderId;
+
+    const otherUserSocketId = getReceiverSocketId(otherUserId);
+    if (otherUserSocketId) {
+      io.to(otherUserSocketId).emit("messageReaction", {
+        messageId: message._id,
+        reaction: { userId, emoji },
+      });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in reactToMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getChatPartners = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
@@ -106,3 +227,4 @@ export const getChatPartners = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
