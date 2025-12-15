@@ -11,18 +11,30 @@ import MessageContextMenu, {
   DeleteMessageModal,
   ForwardMessageModal,
 } from "./MessageContextMenu";
+import { CheckCheck } from "lucide-react";
 
+// Enhanced message animation variants
 const messageVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  hidden: {
+    opacity: 0,
+    y: 30,
+    scale: 0.9,
+  },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
       type: "spring",
-      stiffness: 500,
-      damping: 30
+      stiffness: 400,
+      damping: 25
     }
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.8,
+    x: 50,
+    transition: { duration: 0.2 }
   }
 };
 
@@ -31,7 +43,21 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05
+      staggerChildren: 0.08
+    }
+  }
+};
+
+// Reaction popup animation
+const reactionPopupVariants = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: {
+    scale: 1,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 15
     }
   }
 };
@@ -59,15 +85,19 @@ function ChatContainer() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [forwardModal, setForwardModal] = useState(null);
 
+  // Double tap detection
+  const [lastTap, setLastTap] = useState({ time: 0, messageId: null });
+  const [showReadAnimation, setShowReadAnimation] = useState(null);
+
   // Long press detection
   const longPressTimer = useRef(null);
   const touchStartPos = useRef({ x: 0, y: 0 });
+  const isLongPress = useRef(false);
 
   useEffect(() => {
     getMessagesByUserId(selectedUser._id);
     subscribeToMessages();
 
-    // clean up
     return () => unsubscribeFromMessages();
   }, [selectedUser, getMessagesByUserId, subscribeToMessages, unsubscribeFromMessages]);
 
@@ -77,9 +107,21 @@ function ChatContainer() {
     }
   }, [messages]);
 
+  // Handle double tap to mark as read
+  const handleDoubleTap = useCallback((msg) => {
+    const now = Date.now();
+    if (lastTap.messageId === msg._id && now - lastTap.time < 300) {
+      setShowReadAnimation(msg._id);
+      setTimeout(() => setShowReadAnimation(null), 1000);
+    }
+    setLastTap({ time: now, messageId: msg._id });
+  }, [lastTap]);
+
   // Handle right-click (desktop)
   const handleContextMenu = useCallback((e, msg) => {
     e.preventDefault();
+    e.stopPropagation();
+    console.log("Context menu triggered for message:", msg._id);
     setContextMenu({
       message: msg,
       position: { x: e.clientX, y: e.clientY },
@@ -88,12 +130,15 @@ function ChatContainer() {
 
   // Handle long press start (mobile)
   const handleTouchStart = useCallback((e, msg) => {
+    isLongPress.current = false;
     touchStartPos.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
     };
 
     longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      console.log("Long press triggered for message:", msg._id);
       setContextMenu({
         message: msg,
         position: {
@@ -101,11 +146,10 @@ function ChatContainer() {
           y: touchStartPos.current.y,
         },
       });
-      // Vibrate for haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate(50);
       }
-    }, 500); // 500ms long press
+    }, 500);
   }, []);
 
   // Handle touch move (cancel long press if moved)
@@ -122,21 +166,29 @@ function ChatContainer() {
     }
   }, []);
 
-  // Handle touch end (cancel long press)
-  const handleTouchEnd = useCallback(() => {
+  // Handle touch end
+  const handleTouchEnd = useCallback((e, msg) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-  }, []);
+
+    // Only handle double tap if it wasn't a long press
+    if (!isLongPress.current) {
+      handleDoubleTap(msg);
+    }
+    isLongPress.current = false;
+  }, [handleDoubleTap]);
 
   // Close context menu
   const closeContextMenu = useCallback(() => {
+    console.log("Closing context menu");
     setContextMenu(null);
   }, []);
 
   // Handle edit
   const handleEdit = useCallback((msg) => {
+    console.log("Edit clicked for:", msg._id);
     setEditModal(msg);
   }, []);
 
@@ -149,6 +201,7 @@ function ChatContainer() {
 
   // Handle delete
   const handleDelete = useCallback((msg) => {
+    console.log("Delete clicked for:", msg._id);
     setDeleteModal(msg);
   }, []);
 
@@ -161,6 +214,7 @@ function ChatContainer() {
 
   // Handle react
   const handleReact = useCallback(async (msg, emoji) => {
+    console.log("React clicked:", emoji, "for:", msg._id);
     if (reactToMessage) {
       await reactToMessage(msg._id, emoji);
     }
@@ -168,6 +222,7 @@ function ChatContainer() {
 
   // Handle forward
   const handleForward = useCallback((msg) => {
+    console.log("Forward clicked for:", msg._id);
     setForwardModal(msg);
   }, []);
 
@@ -177,6 +232,8 @@ function ChatContainer() {
       await forwardMessage(msg, userIds);
     }
   }, [forwardMessage]);
+
+  const isOwnMessage = (msg) => msg.senderId === authUser._id;
 
   return (
     <>
@@ -192,67 +249,106 @@ function ChatContainer() {
             initial="hidden"
             animate="visible"
           >
-            {messages.map((msg, index) => (
-              <motion.div
-                key={msg._id}
-                variants={messageVariants}
-                className={`chat ${msg.senderId === authUser._id ? "chat-end" : "chat-start"}`}
-                onContextMenu={(e) => handleContextMenu(e, msg)}
-                onTouchStart={(e) => handleTouchStart(e, msg)}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
+            <AnimatePresence mode="popLayout">
+              {messages.map((msg) => (
                 <motion.div
-                  className={`chat-bubble relative max-w-[85%] md:max-w-[70%] ${msg.senderId === authUser._id
-                    ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/20"
-                    : "bg-slate-800/80 text-slate-200 border border-slate-700/50"
-                    }`}
-                  whileHover={{ scale: 1.01 }}
-                  transition={{ type: "spring", stiffness: 400 }}
+                  key={msg._id}
+                  layout
+                  variants={messageVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className={`chat ${isOwnMessage(msg) ? "chat-end" : "chat-start"}`}
                 >
-                  {msg.image && (
-                    <motion.img
-                      src={msg.image}
-                      alt="Shared"
-                      className="rounded-lg h-32 md:h-48 w-auto object-cover"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  )}
-                  {msg.text && (
-                    <p className="mt-2 text-sm md:text-base break-words">
-                      {msg.text}
-                    </p>
-                  )}
-
-                  {/* Emoji reactions display */}
-                  {msg.reactions && msg.reactions.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {msg.reactions.map((reaction, idx) => (
-                        <span
-                          key={idx}
-                          className="text-xs bg-slate-900/50 rounded-full px-1.5 py-0.5"
+                  {/* Message bubble with event handlers */}
+                  <div
+                    className={`chat-bubble relative max-w-[85%] md:max-w-[70%] cursor-pointer select-none transition-transform active:scale-95 ${isOwnMessage(msg)
+                        ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/20"
+                        : "bg-slate-800/80 text-slate-200 border border-slate-700/50"
+                      }`}
+                    onContextMenu={(e) => handleContextMenu(e, msg)}
+                    onTouchStart={(e) => handleTouchStart(e, msg)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={(e) => handleTouchEnd(e, msg)}
+                    onDoubleClick={() => handleDoubleTap(msg)}
+                  >
+                    {/* Double tap read animation overlay */}
+                    <AnimatePresence>
+                      {showReadAnimation === msg._id && (
+                        <motion.div
+                          className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-2xl z-10 pointer-events-none"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
                         >
-                          {reaction.emoji}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                          <motion.div
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1.5, rotate: 0 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                          >
+                            <CheckCheck className="w-12 h-12 text-cyan-400" />
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                  <p className="text-xs mt-1 opacity-70 flex items-center gap-1">
-                    {new Date(msg.createdAt).toLocaleTimeString(undefined, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {msg.isEdited && (
-                      <span className="italic"> (edited)</span>
+                    {msg.image && (
+                      <motion.img
+                        src={msg.image}
+                        alt="Shared"
+                        className="rounded-lg h-32 md:h-48 w-auto object-cover pointer-events-none"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                      />
                     )}
-                  </p>
+                    {msg.text && (
+                      <p className="mt-2 text-sm md:text-base break-words pointer-events-none">
+                        {msg.text}
+                      </p>
+                    )}
+
+                    {/* Emoji reactions display */}
+                    <AnimatePresence>
+                      {msg.reactions && msg.reactions.length > 0 && (
+                        <motion.div
+                          className="flex flex-wrap gap-1 mt-2 pointer-events-none"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                        >
+                          {msg.reactions.map((reaction, idx) => (
+                            <motion.span
+                              key={idx}
+                              className="text-sm bg-slate-900/50 rounded-full px-2 py-0.5"
+                              variants={reactionPopupVariants}
+                              initial="hidden"
+                              animate="visible"
+                            >
+                              {reaction.emoji}
+                            </motion.span>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <p className="text-xs mt-1 opacity-70 flex items-center gap-1 pointer-events-none">
+                      {new Date(msg.createdAt).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {msg.isEdited && (
+                        <span className="italic"> (edited)</span>
+                      )}
+                      {isOwnMessage(msg) && (
+                        <CheckCheck className="w-3.5 h-3.5 ml-1 text-white/70" />
+                      )}
+                    </p>
+                  </div>
                 </motion.div>
-              </motion.div>
-            ))}
-            {/* 👇 scroll target */}
+              ))}
+            </AnimatePresence>
             <div ref={messageEndRef} />
           </motion.div>
         ) : isMessagesLoading ? (
@@ -265,20 +361,18 @@ function ChatContainer() {
       <MessageInput />
 
       {/* Context Menu */}
-      <AnimatePresence>
-        {contextMenu && (
-          <MessageContextMenu
-            message={contextMenu.message}
-            position={contextMenu.position}
-            onClose={closeContextMenu}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onReact={handleReact}
-            onForward={handleForward}
-            isOwnMessage={contextMenu.message.senderId === authUser._id}
-          />
-        )}
-      </AnimatePresence>
+      {contextMenu && (
+        <MessageContextMenu
+          message={contextMenu.message}
+          position={contextMenu.position}
+          onClose={closeContextMenu}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onReact={handleReact}
+          onForward={handleForward}
+          isOwnMessage={contextMenu.message.senderId === authUser._id}
+        />
+      )}
 
       {/* Edit Modal */}
       <AnimatePresence>
