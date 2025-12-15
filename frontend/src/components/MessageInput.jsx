@@ -12,6 +12,7 @@ function MessageInput({ replyTo, onCancelReply }) {
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
   const inputRef = useRef(null);
+  const containerRef = useRef(null);
 
   const fileInputRef = useRef(null);
 
@@ -23,6 +24,17 @@ function MessageInput({ replyTo, onCancelReply }) {
       inputRef.current.focus();
     }
   }, [replyTo]);
+
+  // Handle input focus for mobile keyboard
+  const handleInputFocus = () => {
+    // Small delay to let keyboard open
+    setTimeout(() => {
+      if (inputRef.current) {
+        // Scroll input into view on iOS/Android
+        inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  };
 
   // Debounced typing handler
   const handleTyping = useCallback(() => {
@@ -105,7 +117,8 @@ function MessageInput({ replyTo, onCancelReply }) {
 
   return (
     <motion.div
-      className="border-t border-slate-700/50 bg-slate-900/50 backdrop-blur-sm safe-area-bottom"
+      ref={containerRef}
+      className="border-t border-slate-700/50 bg-slate-900/50 backdrop-blur-sm safe-area-bottom chat-input-area keyboard-transition"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
@@ -175,6 +188,11 @@ function MessageInput({ replyTo, onCancelReply }) {
             type="text"
             value={text}
             onChange={handleTextChange}
+            onFocus={handleInputFocus}
+            enterKeyHint="send"
+            autoComplete="off"
+            autoCorrect="on"
+            spellCheck="true"
             className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-xl py-2.5 md:py-3 px-4 text-sm md:text-base text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all"
             placeholder={replyTo ? "Type your reply..." : "Type your message..."}
           />

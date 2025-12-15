@@ -14,7 +14,7 @@ function ChatPage() {
 
   return (
     <motion.div
-      className="relative w-full max-w-6xl h-[100dvh] md:h-[800px]"
+      className="relative w-full max-w-6xl h-[100dvh] md:h-[800px] ios-keyboard-fix"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}

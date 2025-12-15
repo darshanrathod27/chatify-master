@@ -40,6 +40,7 @@ function ChatContainer() {
     return () => unsubscribeFromMessages();
   }, [selectedUser, getMessagesByUserId, subscribeToMessages, unsubscribeFromMessages]);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
     if (messageEndRef.current && scrollContainerRef.current) {
       const container = scrollContainerRef.current;
@@ -49,6 +50,28 @@ function ChatContainer() {
       }
     }
   }, [messages]);
+
+  // Handle keyboard open/close on mobile (iOS & Android)
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (messageEndRef.current) {
+        messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+
+    // Visual Viewport API for keyboard detection (works on iOS & Android)
+    if (window.visualViewport) {
+      const handleViewportResize = () => {
+        // Small delay to let keyboard animation complete
+        setTimeout(scrollToBottom, 100);
+      };
+
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      return () => {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+      };
+    }
+  }, []);
 
   const handleContextMenu = useCallback((e, msg) => {
     e.preventDefault();
@@ -125,7 +148,7 @@ function ChatContainer() {
   return (
     <div ref={chatContainerRef} className="flex flex-col h-full w-full relative">
       <ChatHeader />
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-4 md:px-8 hide-scrollbar bg-slate-900/30">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-4 md:px-8 hide-scrollbar bg-slate-900/30 chat-messages-container">
         {messages.length > 0 && !isMessagesLoading ? (
           <div className="max-w-4xl mx-auto flex flex-col gap-2">
             {messages.map((msg) => {
