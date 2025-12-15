@@ -13,18 +13,6 @@ import MessageContextMenu, {
 } from "./MessageContextMenu";
 import { Check, CheckCheck, CornerUpLeft } from "lucide-react";
 
-// Simplified animation - just fade in, no jumping
-const messageVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.15 } },
-  exit: { opacity: 0, transition: { duration: 0.1 } }
-};
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 }
-};
-
 function ChatContainer() {
   const {
     selectedUser, getMessagesByUserId, messages, isMessagesLoading,
@@ -43,7 +31,6 @@ function ChatContainer() {
 
   const longPressTimer = useRef(null);
   const touchStartPos = useRef({ x: 0, y: 0 });
-  const isLongPress = useRef(false);
 
   useEffect(() => {
     getMessagesByUserId(selectedUser._id);
@@ -52,23 +39,27 @@ function ChatContainer() {
   }, [selectedUser, getMessagesByUserId, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
-    if (messageEndRef.current) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (messageEndRef.current && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (isNearBottom) {
+        messageEndRef.current.scrollIntoView({ behavior: "auto" });
+      }
     }
   }, [messages]);
 
   const handleContextMenu = useCallback((e, msg) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ message: msg, position: { x: e.clientX, y: e.clientY } });
+    const bubbleRect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({ message: msg, position: { x: bubbleRect.right, y: bubbleRect.top, bubbleRect } });
   }, []);
 
   const handleTouchStart = useCallback((e, msg) => {
-    isLongPress.current = false;
     touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    const bubbleRect = e.currentTarget.getBoundingClientRect();
     longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      setContextMenu({ message: msg, position: { x: touchStartPos.current.x, y: touchStartPos.current.y } });
+      setContextMenu({ message: msg, position: { x: bubbleRect.right, y: bubbleRect.top, bubbleRect } });
       if (navigator.vibrate) navigator.vibrate(50);
     }, 400);
   }, []);
@@ -77,19 +68,12 @@ function ChatContainer() {
     const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
     const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
     if (dx > 10 || dy > 10) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
     }
   }, []);
 
   const handleTouchEnd = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    isLongPress.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
   }, []);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
@@ -108,82 +92,97 @@ function ChatContainer() {
   return (
     <>
       <ChatHeader />
-      <div ref={scrollContainerRef} className="flex-1 px-3 md:px-6 overflow-y-auto py-4 md:py-6 hide-scrollbar">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-4 md:px-8 hide-scrollbar bg-slate-900/30">
         {messages.length > 0 && !isMessagesLoading ? (
-          <motion.div className="max-w-3xl mx-auto space-y-4" variants={containerVariants} initial="hidden" animate="visible">
-            <AnimatePresence mode="popLayout">
-              {messages.map((msg) => {
-                const replyMessage = getReplyMessage(msg);
-                const hasReactions = msg.reactions && msg.reactions.length > 0;
+          <div className="max-w-4xl mx-auto flex flex-col gap-2">
+            {messages.map((msg) => {
+              const replyMessage = getReplyMessage(msg);
+              const hasReactions = msg.reactions && msg.reactions.length > 0;
+              const isOwn = isOwnMessage(msg);
 
-                return (
-                  <motion.div
-                    key={msg._id}
-                    layout
-                    variants={messageVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    className={`chat ${isOwnMessage(msg) ? "chat-end" : "chat-start"} ${hasReactions ? "mb-4" : ""}`}
+              return (
+                <div
+                  key={msg._id}
+                  className={`flex w-full ${isOwn ? "justify-end" : "justify-start"} ${hasReactions ? "mb-4" : ""}`}
+                >
+                  {/* Message bubble container */}
+                  <div
+                    className={`relative inline-block`}
+                    style={{ maxWidth: "75%" }}
                   >
-                    <div className="relative inline-block max-w-[85%] md:max-w-[70%]">
-                      <div
-                        className={`chat-bubble cursor-pointer select-none transition-transform active:scale-[0.98] ${isOwnMessage(msg)
-                          ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/20"
-                          : "bg-slate-800/90 text-slate-200 border border-slate-700/50"
-                          }`}
-                        onContextMenu={(e) => handleContextMenu(e, msg)}
-                        onTouchStart={(e) => handleTouchStart(e, msg)}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                      >
-                        {replyMessage && (
-                          <div className={`flex items-start gap-1.5 mb-2 p-2 rounded-lg text-xs ${isOwnMessage(msg) ? "bg-white/10" : "bg-slate-700/50"}`}>
-                            <CornerUpLeft className="w-3 h-3 mt-0.5 opacity-60" />
-                            <p className="opacity-70 truncate">{replyMessage.text || "📷 Image"}</p>
-                          </div>
-                        )}
-                        {msg.image && <img src={msg.image} alt="" className="rounded-lg h-32 md:h-40 w-auto object-cover pointer-events-none" />}
-                        {msg.text && <p className="text-sm md:text-base break-words pointer-events-none">{msg.text}</p>}
-                        <p className="text-xs mt-1 opacity-60 flex items-center gap-1 pointer-events-none">
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          {msg.isEdited && <span className="italic"> (edited)</span>}
-                          {/* Message status ticks: single=sent, double grey=delivered, double blue=read */}
-                          {isOwnMessage(msg) && (
-                            msg.isRead ? (
-                              <CheckCheck className="w-3.5 h-3.5 ml-1 text-cyan-300" />
-                            ) : msg.isDelivered ? (
-                              <CheckCheck className="w-3.5 h-3.5 ml-1 text-white/50" />
-                            ) : (
-                              <Check className="w-3.5 h-3.5 ml-1 text-white/50" />
-                            )
-                          )}
-                        </p>
-                      </div>
-
-                      {/* Floating reactions */}
-                      {hasReactions && (
-                        <motion.div
-                          className={`absolute -bottom-3 ${isOwnMessage(msg) ? "right-1" : "left-1"}`}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 500 }}
-                        >
-                          <div className="flex items-center bg-slate-900/95 backdrop-blur rounded-full px-1.5 py-0.5 shadow-lg border border-slate-700/50">
-                            {msg.reactions.slice(0, 4).map((r, i) => (
-                              <span key={i} className="text-sm -mx-0.5">{r.emoji}</span>
-                            ))}
-                            {msg.reactions.length > 4 && <span className="text-[10px] text-slate-400 ml-1">+{msg.reactions.length - 4}</span>}
-                          </div>
-                        </motion.div>
+                    {/* Bubble */}
+                    <div
+                      className={`inline-block px-4 py-2.5 rounded-2xl cursor-pointer select-none shadow-md ${isOwn
+                          ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-br-sm"
+                          : "bg-slate-800 text-slate-100 border border-slate-700/50 rounded-bl-sm"
+                        }`}
+                      style={{ minWidth: "60px" }}
+                      onContextMenu={(e) => handleContextMenu(e, msg)}
+                      onTouchStart={(e) => handleTouchStart(e, msg)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      {/* Reply preview */}
+                      {replyMessage && (
+                        <div className={`mb-2 p-2 rounded-lg text-xs border-l-2 ${isOwn ? "bg-white/10 border-white/30" : "bg-slate-700/50 border-cyan-400"
+                          }`}>
+                          <p className="opacity-80 line-clamp-1">{replyMessage.text || "📷 Image"}</p>
+                        </div>
                       )}
+
+                      {/* Image */}
+                      {msg.image && (
+                        <img
+                          src={msg.image}
+                          alt=""
+                          className="rounded-lg max-h-52 w-auto object-cover mb-2 max-w-full"
+                        />
+                      )}
+
+                      {/* Message text - IMPORTANT: display inline to prevent vertical stacking */}
+                      {msg.text && (
+                        <p className="text-sm md:text-base leading-relaxed" style={{ wordBreak: "break-word" }}>
+                          {msg.text}
+                        </p>
+                      )}
+
+                      {/* Timestamp and status */}
+                      <div className={`flex items-center gap-1.5 mt-1.5 ${isOwn ? "justify-end" : "justify-start"}`}>
+                        <span className="text-[11px] opacity-60">
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {msg.isEdited && <span className="text-[10px] opacity-50 italic">(edited)</span>}
+                        {isOwn && (
+                          msg.isRead ? (
+                            <CheckCheck className="w-4 h-4 text-cyan-200" />
+                          ) : msg.isDelivered ? (
+                            <CheckCheck className="w-4 h-4 opacity-60" />
+                          ) : (
+                            <Check className="w-4 h-4 opacity-60" />
+                          )
+                        )}
+                      </div>
                     </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+
+                    {/* Floating reactions */}
+                    {hasReactions && (
+                      <div className={`absolute -bottom-3 ${isOwn ? "right-2" : "left-2"} z-10`}>
+                        <div className="flex items-center bg-slate-900/95 backdrop-blur-sm rounded-full px-2 py-1 shadow-lg border border-slate-700/50">
+                          {msg.reactions.slice(0, 4).map((r, i) => (
+                            <span key={i} className="text-sm">{r.emoji}</span>
+                          ))}
+                          {msg.reactions.length > 4 && (
+                            <span className="text-[10px] text-slate-400 ml-1">+{msg.reactions.length - 4}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             <div ref={messageEndRef} />
-          </motion.div>
+          </div>
         ) : isMessagesLoading ? (
           <MessagesLoadingSkeleton />
         ) : (

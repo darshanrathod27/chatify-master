@@ -103,16 +103,34 @@ export const logout = (_, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic } = req.body;
-    if (!profilePic) return res.status(400).json({ message: "Profile pic is required" });
-
+    const { profilePic, fullName } = req.body;
     const userId = req.user._id;
 
-    const uploadResponse = await cloudinary.uploader.upload(profilePic);
+    const updates = {};
+
+    // Handle profile picture update
+    if (profilePic) {
+      // Check if it's a DiceBear URL or base64 image
+      if (profilePic.startsWith("https://api.dicebear.com")) {
+        updates.profilePic = profilePic;
+      } else {
+        const uploadResponse = await cloudinary.uploader.upload(profilePic);
+        updates.profilePic = uploadResponse.secure_url;
+      }
+    }
+
+    // Handle name update
+    if (fullName && fullName.trim().length > 0) {
+      updates.fullName = fullName.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No updates provided" });
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { profilePic: uploadResponse.secure_url },
+      updates,
       { new: true }
     );
 

@@ -71,33 +71,46 @@ function MessageContextMenu({
     const [activeButton, setActiveButton] = useState(null);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
-    // Calculate proper menu position
+    // Calculate WhatsApp-style menu position (attached to bubble)
     useEffect(() => {
-        if (menuRef.current) {
-            const menuRect = menuRef.current.getBoundingClientRect();
-            const menuHeight = 220; // estimated height
-            const menuWidth = 160;
+        const menuHeight = 200;
+        const menuWidth = 150;
+        const bubbleRect = position.bubbleRect;
 
-            let top = position.y;
-            let left = position.x;
+        let top, left;
 
-            // Adjust if menu goes off screen bottom
-            if (top + menuHeight > window.innerHeight - 20) {
-                top = Math.max(20, position.y - menuHeight);
+        if (bubbleRect) {
+            // WhatsApp-style: position menu next to bubble
+            if (isOwnMessage) {
+                // Own message: menu on the left of bubble
+                left = bubbleRect.left - menuWidth - 8;
+                if (left < 10) left = bubbleRect.right + 8; // Flip if no space
+            } else {
+                // Other's message: menu on the right of bubble
+                left = bubbleRect.right + 8;
+                if (left + menuWidth > window.innerWidth - 10) left = bubbleRect.left - menuWidth - 8;
             }
 
-            // Adjust if menu goes off screen right
-            if (left + menuWidth > window.innerWidth - 20) {
-                left = Math.max(20, position.x - menuWidth);
-            }
-
-            // Ensure minimum bounds
-            top = Math.max(10, Math.min(top, window.innerHeight - menuHeight - 10));
-            left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10));
-
-            setMenuPosition({ top, left });
+            // Vertically center relative to bubble
+            top = bubbleRect.top;
+        } else {
+            // Fallback to click position
+            left = position.x;
+            top = position.y;
         }
-    }, [position]);
+
+        // Ensure menu stays within screen bounds
+        if (top + menuHeight > window.innerHeight - 20) {
+            top = window.innerHeight - menuHeight - 20;
+        }
+        if (top < 10) top = 10;
+        if (left < 10) left = 10;
+        if (left + menuWidth > window.innerWidth - 10) {
+            left = window.innerWidth - menuWidth - 10;
+        }
+
+        setMenuPosition({ top, left });
+    }, [position, isOwnMessage]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -261,8 +274,8 @@ function MessageContextMenu({
                     <motion.button
                         key={item.label}
                         className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-all duration-150 ${activeButton === item.label
-                                ? `${item.activeBg} ${item.color}`
-                                : `text-slate-200 ${item.hoverBg}`
+                            ? `${item.activeBg} ${item.color}`
+                            : `text-slate-200 ${item.hoverBg}`
                             }`}
                         onClick={item.onClick}
                         variants={menuItemVariants}
@@ -462,8 +475,8 @@ export function ForwardMessageModal({ message, onForward, onClose }) {
                         <motion.button
                             key={contact._id}
                             className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${selectedUsers.includes(contact._id)
-                                    ? "bg-cyan-500/20 border border-cyan-500/50"
-                                    : "bg-slate-700/30 hover:bg-slate-700/50 border border-transparent"
+                                ? "bg-cyan-500/20 border border-cyan-500/50"
+                                : "bg-slate-700/30 hover:bg-slate-700/50 border border-transparent"
                                 }`}
                             onClick={() => toggleUser(contact._id)}
                             whileTap={{ scale: 0.98 }}
@@ -501,8 +514,8 @@ export function ForwardMessageModal({ message, onForward, onClose }) {
                     </motion.button>
                     <motion.button
                         className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${selectedUsers.length > 0
-                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25"
-                                : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                            ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25"
+                            : "bg-slate-700 text-slate-500 cursor-not-allowed"
                             }`}
                         onClick={handleForward}
                         disabled={selectedUsers.length === 0}

@@ -44,8 +44,22 @@
 ### 💬 Real-Time Communication
 - **Instant Messaging** - Real-time chat via Socket.io
 - **Online/Offline Status** - Live presence indicators
-- **Typing Indicators** - See when someone is typing
+- **Typing Indicators** - See when someone is typing (animated dots)
 - **Message Notifications** - Sound alerts for new messages
+- **Viewing Chat Indicator** - Snapchat-style "viewing chat" status
+
+### 📱 WhatsApp-Style Message Features
+- **Message Actions** - Long-press/right-click context menu
+- **Edit Messages** - Edit your sent messages
+- **Delete Messages** - Delete messages for everyone
+- **Reply to Messages** - Quote and reply to specific messages
+- **Forward Messages** - Forward to multiple contacts
+- **Emoji Reactions** - React with 👍❤️😂😮😢🙏🔥👏
+- **Read Receipts** - WhatsApp-style tick indicators:
+  - ✓ Single grey tick = Sent
+  - ✓✓ Double grey tick = Delivered
+  - ✓✓ Double blue tick = Seen
+- **Unread Message Badges** - Count badges on chat list
 
 ### 👤 User Experience
 - **Profile Avatars** - Image uploads via Cloudinary
@@ -74,6 +88,9 @@
 3. ✅ Start a real-time conversation
 4. ✅ See online/offline status indicators
 5. ✅ Experience instant message delivery
+6. ✅ Long-press a message for edit/delete/reply/forward options
+7. ✅ Add emoji reactions to messages
+8. ✅ Watch the blue ticks appear when messages are read
 
 ---
 
