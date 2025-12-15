@@ -11,7 +11,7 @@ export const useChatStore = create((set, get) => ({
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
-  isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
+  isSoundEnabled: localStorage.getItem("isSoundEnabled") !== "false",
   showMobileSidebar: true,
 
   // Typing and viewing indicators
