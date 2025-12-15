@@ -17,16 +17,18 @@
 ## 📸 Screenshots
 
 <div align="center">
-
-### 🏠 Main Chat Interface
-![Main Chat Interface](./frontend/public/screenshot-for-readme.png)
-
-### 🔐 Login Page
-![Login Page](./frontend/public/login.png)
-
-### 📝 Sign Up Page
-![Sign Up Page](./frontend/public/signup.png)
-
+<table>
+<tr>
+<td align="center"><b>🏠 Main Chat</b></td>
+<td align="center"><b>🔐 Login</b></td>
+<td align="center"><b>📝 Sign Up</b></td>
+</tr>
+<tr>
+<td><img src="./frontend/public/screenshot-for-readme.png" width="280" alt="Chat Interface"/></td>
+<td><img src="./frontend/public/login.png" width="280" alt="Login Page"/></td>
+<td><img src="./frontend/public/signup.png" width="280" alt="Sign Up Page"/></td>
+</tr>
+</table>
 </div>
 
 ---
