@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Trash2, Forward, Smile, X, Check, CheckCheck } from "lucide-react";
+import { Pencil, Trash2, Forward, Smile, X, Check, Reply, CornerUpLeft } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -11,49 +11,46 @@ const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥
 const menuVariants = {
     hidden: {
         opacity: 0,
-        scale: 0.8,
-        y: -10,
-        filter: "blur(4px)"
+        scale: 0.85,
+        y: 10
     },
     visible: {
         opacity: 1,
         scale: 1,
         y: 0,
-        filter: "blur(0px)",
         transition: {
             type: "spring",
             stiffness: 400,
             damping: 25,
-            staggerChildren: 0.05
+            staggerChildren: 0.03
         }
     },
     exit: {
         opacity: 0,
-        scale: 0.8,
-        y: -10,
-        filter: "blur(4px)",
-        transition: { duration: 0.15 }
+        scale: 0.85,
+        y: 10,
+        transition: { duration: 0.12 }
     }
 };
 
 const menuItemVariants = {
-    hidden: { opacity: 0, x: -10 },
+    hidden: { opacity: 0, x: -8 },
     visible: {
         opacity: 1,
         x: 0,
-        transition: { type: "spring", stiffness: 300 }
+        transition: { type: "spring", stiffness: 350 }
     }
 };
 
 const emojiVariants = {
-    hidden: { scale: 0, rotate: -180 },
+    hidden: { scale: 0, rotate: -90 },
     visible: (i) => ({
         scale: 1,
         rotate: 0,
         transition: {
             type: "spring",
-            stiffness: 400,
-            delay: i * 0.03
+            stiffness: 450,
+            delay: i * 0.025
         }
     })
 };
@@ -66,11 +63,41 @@ function MessageContextMenu({
     onDelete,
     onReact,
     onForward,
+    onReply,
     isOwnMessage,
 }) {
     const menuRef = useRef(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [activeButton, setActiveButton] = useState(null);
+    const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+    // Calculate proper menu position
+    useEffect(() => {
+        if (menuRef.current) {
+            const menuRect = menuRef.current.getBoundingClientRect();
+            const menuHeight = 220; // estimated height
+            const menuWidth = 160;
+
+            let top = position.y;
+            let left = position.x;
+
+            // Adjust if menu goes off screen bottom
+            if (top + menuHeight > window.innerHeight - 20) {
+                top = Math.max(20, position.y - menuHeight);
+            }
+
+            // Adjust if menu goes off screen right
+            if (left + menuWidth > window.innerWidth - 20) {
+                left = Math.max(20, position.x - menuWidth);
+            }
+
+            // Ensure minimum bounds
+            top = Math.max(10, Math.min(top, window.innerHeight - menuHeight - 10));
+            left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10));
+
+            setMenuPosition({ top, left });
+        }
+    }, [position]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -80,10 +107,14 @@ function MessageContextMenu({
             }
         };
 
-        document.addEventListener("mousedown", handleClickOutside);
-        document.addEventListener("touchstart", handleClickOutside);
+        // Delay adding listeners to prevent immediate close
+        const timer = setTimeout(() => {
+            document.addEventListener("mousedown", handleClickOutside);
+            document.addEventListener("touchstart", handleClickOutside);
+        }, 100);
 
         return () => {
+            clearTimeout(timer);
             document.removeEventListener("mousedown", handleClickOutside);
             document.removeEventListener("touchstart", handleClickOutside);
         };
@@ -100,13 +131,26 @@ function MessageContextMenu({
 
     const handleButtonClick = (action, label) => {
         setActiveButton(label);
-        // Small delay for visual feedback
         setTimeout(() => {
             action();
-        }, 150);
+        }, 100);
     };
 
     const menuItems = [
+        // Reply option (for all messages)
+        {
+            icon: CornerUpLeft,
+            label: "Reply",
+            onClick: () => {
+                handleButtonClick(() => {
+                    onReply?.(message);
+                    onClose();
+                }, "Reply");
+            },
+            color: "text-blue-400",
+            hoverBg: "hover:bg-blue-500/20",
+            activeBg: "bg-blue-500/30",
+        },
         ...(isOwnMessage
             ? [
                 {
@@ -164,104 +208,76 @@ function MessageContextMenu({
     ];
 
     return (
-        <AnimatePresence>
-            <motion.div
-                ref={menuRef}
-                className="fixed z-50 bg-slate-800/95 backdrop-blur-md border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden"
-                style={{
-                    top: Math.min(position.y, window.innerHeight - 280),
-                    left: Math.min(position.x, window.innerWidth - 180),
-                }}
-                variants={menuVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-            >
-                {/* Emoji picker */}
-                <AnimatePresence>
-                    {showEmojiPicker && (
-                        <motion.div
-                            className="flex gap-1 p-3 border-b border-slate-700/50 flex-wrap max-w-[220px] justify-center"
-                            initial={{ height: 0, opacity: 0, padding: 0 }}
-                            animate={{ height: "auto", opacity: 1, padding: "12px" }}
-                            exit={{ height: 0, opacity: 0, padding: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                        >
-                            {EMOJI_REACTIONS.map((emoji, i) => (
-                                <motion.button
-                                    key={emoji}
-                                    className="text-2xl p-2 hover:bg-slate-700/50 rounded-xl transition-colors active:scale-90"
-                                    onClick={() => {
-                                        onReact(message, emoji);
-                                        onClose();
-                                    }}
-                                    custom={i}
-                                    variants={emojiVariants}
-                                    initial="hidden"
-                                    animate="visible"
-                                    whileHover={{
-                                        scale: 1.3,
-                                        rotate: [0, -10, 10, 0],
-                                        transition: { duration: 0.3 }
-                                    }}
-                                    whileTap={{ scale: 0.8 }}
-                                >
-                                    {emoji}
-                                </motion.button>
-                            ))}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Menu items */}
-                <motion.div
-                    className="p-2"
-                    variants={menuVariants}
-                >
-                    {menuItems.map((item, index) => (
-                        <motion.button
-                            key={item.label}
-                            className={`w-full flex items-center gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-200 ${activeButton === item.label
-                                    ? `${item.activeBg} ${item.color}`
-                                    : `text-slate-200 ${item.hoverBg}`
-                                }`}
-                            onClick={item.onClick}
-                            variants={menuItemVariants}
-                            whileHover={{
-                                x: 6,
-                                backgroundColor: "rgba(255,255,255,0.05)",
-                                transition: { duration: 0.2 }
-                            }}
-                            whileTap={{
-                                scale: 0.95,
-                                transition: { duration: 0.1 }
-                            }}
-                        >
-                            <motion.div
-                                animate={activeButton === item.label ? {
-                                    rotate: [0, -10, 10, 0],
-                                    scale: [1, 1.2, 1]
-                                } : {}}
-                                transition={{ duration: 0.3 }}
+        <motion.div
+            ref={menuRef}
+            className="fixed z-[100] bg-slate-800/98 backdrop-blur-lg border border-slate-600/50 rounded-2xl shadow-2xl overflow-hidden min-w-[150px]"
+            style={{
+                top: menuPosition.top || position.y,
+                left: menuPosition.left || position.x,
+            }}
+            variants={menuVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+        >
+            {/* Emoji picker */}
+            <AnimatePresence>
+                {showEmojiPicker && (
+                    <motion.div
+                        className="flex gap-1.5 p-3 border-b border-slate-700/50 flex-wrap max-w-[200px] justify-center bg-slate-900/50"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                    >
+                        {EMOJI_REACTIONS.map((emoji, i) => (
+                            <motion.button
+                                key={emoji}
+                                className="text-xl p-1.5 hover:bg-slate-700/60 rounded-lg transition-colors active:scale-90"
+                                onClick={() => {
+                                    onReact(message, emoji);
+                                    onClose();
+                                }}
+                                custom={i}
+                                variants={emojiVariants}
+                                initial="hidden"
+                                animate="visible"
+                                whileHover={{
+                                    scale: 1.25,
+                                    transition: { duration: 0.15 }
+                                }}
+                                whileTap={{ scale: 0.85 }}
                             >
-                                <item.icon className={`w-5 h-5 ${item.color}`} />
-                            </motion.div>
-                            <span className="font-medium">{item.label}</span>
+                                {emoji}
+                            </motion.button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                            {/* Active indicator */}
-                            {activeButton === item.label && (
-                                <motion.div
-                                    className={`ml-auto w-2 h-2 rounded-full ${item.color.replace('text-', 'bg-')}`}
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ type: "spring", stiffness: 500 }}
-                                />
-                            )}
-                        </motion.button>
-                    ))}
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
+            {/* Menu items */}
+            <div className="p-1.5">
+                {menuItems.map((item) => (
+                    <motion.button
+                        key={item.label}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-all duration-150 ${activeButton === item.label
+                                ? `${item.activeBg} ${item.color}`
+                                : `text-slate-200 ${item.hoverBg}`
+                            }`}
+                        onClick={item.onClick}
+                        variants={menuItemVariants}
+                        whileHover={{
+                            x: 3,
+                            transition: { duration: 0.15 }
+                        }}
+                        whileTap={{ scale: 0.97 }}
+                    >
+                        <item.icon className={`w-4 h-4 ${item.color}`} />
+                        <span className="font-medium text-sm">{item.label}</span>
+                    </motion.button>
+                ))}
+            </div>
+        </motion.div>
     );
 }
 
@@ -272,6 +288,7 @@ export function EditMessageModal({ message, onSave, onClose }) {
 
     useEffect(() => {
         inputRef.current?.focus();
+        inputRef.current?.select();
     }, []);
 
     const handleSave = () => {
@@ -283,39 +300,31 @@ export function EditMessageModal({ message, onSave, onClose }) {
 
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
         >
             <motion.div
-                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-6 w-full max-w-md shadow-2xl"
-                initial={{ scale: 0.8, y: 50, rotateX: -15 }}
-                animate={{ scale: 1, y: 0, rotateX: 0 }}
-                exit={{ scale: 0.8, y: 50, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-5 w-full max-w-md shadow-2xl"
+                initial={{ scale: 0.9, y: 30 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 30, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <motion.h3
-                    className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 }}
-                >
+                <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
                     <Pencil className="w-5 h-5 text-cyan-400" />
                     Edit Message
-                </motion.h3>
+                </h3>
 
-                <motion.textarea
+                <textarea
                     ref={inputRef}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all duration-300"
+                    className="w-full bg-slate-900/60 border border-slate-700 rounded-xl p-4 text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
                     rows={3}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -324,31 +333,24 @@ export function EditMessageModal({ message, onSave, onClose }) {
                     }}
                 />
 
-                <motion.div
-                    className="flex justify-end gap-3 mt-4"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
+                <div className="flex justify-end gap-2 mt-4">
                     <motion.button
-                        className="px-5 py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all duration-200 flex items-center gap-2"
+                        className="px-4 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all flex items-center gap-2"
                         onClick={onClose}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                     >
                         <X className="w-4 h-4" />
                         Cancel
                     </motion.button>
                     <motion.button
-                        className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-cyan-500/25"
+                        className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/25"
                         onClick={handleSave}
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                     >
                         <Check className="w-4 h-4" />
                         Save
                     </motion.button>
-                </motion.div>
+                </div>
             </motion.div>
         </motion.div>
     );
@@ -358,73 +360,51 @@ export function EditMessageModal({ message, onSave, onClose }) {
 export function DeleteMessageModal({ message, onConfirm, onClose }) {
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
         >
             <motion.div
-                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
-                initial={{ scale: 0.8, y: 50 }}
+                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-5 w-full max-w-sm shadow-2xl"
+                initial={{ scale: 0.9, y: 30 }}
                 animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.8, y: 50, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                exit={{ scale: 0.9, y: 30, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <motion.div
-                    className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center"
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", delay: 0.1 }}
-                >
-                    <Trash2 className="w-8 h-8 text-red-400" />
-                </motion.div>
+                <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <Trash2 className="w-7 h-7 text-red-400" />
+                </div>
 
-                <motion.h3
-                    className="text-lg font-semibold text-slate-200 mb-2 text-center"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                >
+                <h3 className="text-lg font-semibold text-slate-200 mb-2 text-center">
                     Delete Message?
-                </motion.h3>
-                <motion.p
-                    className="text-slate-400 text-sm mb-6 text-center"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    This message will be permanently deleted. This action cannot be undone.
-                </motion.p>
+                </h3>
+                <p className="text-slate-400 text-sm mb-5 text-center">
+                    This action cannot be undone.
+                </p>
 
-                <motion.div
-                    className="flex gap-3"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                >
+                <div className="flex gap-2">
                     <motion.button
-                        className="flex-1 px-4 py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all duration-200"
+                        className="flex-1 px-4 py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all"
                         onClick={onClose}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                     >
                         Cancel
                     </motion.button>
                     <motion.button
-                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
                         onClick={() => {
                             onConfirm(message._id);
                             onClose();
                         }}
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                     >
                         <Trash2 className="w-4 h-4" />
                         Delete
                     </motion.button>
-                </motion.div>
+                </div>
             </motion.div>
         </motion.div>
     );
@@ -433,7 +413,6 @@ export function DeleteMessageModal({ message, onConfirm, onClose }) {
 // Forward Message Modal
 export function ForwardMessageModal({ message, onForward, onClose }) {
     const { allContacts, getAllContacts, chats } = useChatStore();
-    const { authUser } = useAuthStore();
     const [selectedUsers, setSelectedUsers] = useState([]);
 
     useEffect(() => {
@@ -459,131 +438,111 @@ export function ForwardMessageModal({ message, onForward, onClose }) {
 
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
         >
             <motion.div
-                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl max-h-[80vh] flex flex-col"
-                initial={{ scale: 0.8, y: 50 }}
+                className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl p-5 w-full max-w-sm shadow-2xl max-h-[70vh] flex flex-col"
+                initial={{ scale: 0.9, y: 30 }}
                 animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.8, y: 50, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                exit={{ scale: 0.9, y: 30, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <motion.h3
-                    className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                >
+                <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
                     <Forward className="w-5 h-5 text-green-400" />
                     Forward Message
-                </motion.h3>
+                </h3>
 
-                <div className="flex-1 overflow-y-auto space-y-2 min-h-0 pr-1">
-                    {contacts.map((contact, index) => (
+                <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0 pr-1">
+                    {contacts.map((contact) => (
                         <motion.button
                             key={contact._id}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${selectedUsers.includes(contact._id)
-                                    ? "bg-gradient-to-r from-cyan-500/20 to-green-500/20 border border-cyan-500/50 shadow-lg shadow-cyan-500/10"
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all ${selectedUsers.includes(contact._id)
+                                    ? "bg-cyan-500/20 border border-cyan-500/50"
                                     : "bg-slate-700/30 hover:bg-slate-700/50 border border-transparent"
                                 }`}
                             onClick={() => toggleUser(contact._id)}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            whileHover={{ x: 4 }}
                             whileTap={{ scale: 0.98 }}
                         >
-                            <motion.div
-                                className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-slate-700/50"
-                                animate={selectedUsers.includes(contact._id) ? {
-                                    ring: "2px solid rgb(6 182 212)",
-                                    scale: 1.05
-                                } : {}}
-                            >
+                            <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-slate-700/50">
                                 <img
                                     src={contact.profilePic || "/avatar.png"}
                                     alt={contact.fullName}
                                     className="w-full h-full object-cover"
                                 />
-                            </motion.div>
-                            <span className="text-slate-200 text-sm font-medium">{contact.fullName}</span>
+                            </div>
+                            <span className="text-slate-200 text-sm font-medium flex-1 text-left">{contact.fullName}</span>
 
-                            <AnimatePresence>
-                                {selectedUsers.includes(contact._id) && (
-                                    <motion.div
-                                        className="ml-auto bg-cyan-500 rounded-full p-1"
-                                        initial={{ scale: 0, rotate: -180 }}
-                                        animate={{ scale: 1, rotate: 0 }}
-                                        exit={{ scale: 0, rotate: 180 }}
-                                        transition={{ type: "spring", stiffness: 500 }}
-                                    >
-                                        <Check className="w-3 h-3 text-white" />
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                            {selectedUsers.includes(contact._id) && (
+                                <motion.div
+                                    className="bg-cyan-500 rounded-full p-0.5"
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ type: "spring", stiffness: 500 }}
+                                >
+                                    <Check className="w-3 h-3 text-white" />
+                                </motion.div>
+                            )}
                         </motion.button>
                     ))}
                 </div>
 
-                <motion.div
-                    className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-700/50"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
+                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-700/50">
                     <motion.button
-                        className="px-4 py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all duration-200"
+                        className="px-4 py-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-all"
                         onClick={onClose}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                     >
                         Cancel
                     </motion.button>
                     <motion.button
-                        className={`px-4 py-2.5 rounded-xl transition-all duration-200 flex items-center gap-2 ${selectedUsers.length > 0
-                                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/25"
+                        className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${selectedUsers.length > 0
+                                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25"
                                 : "bg-slate-700 text-slate-500 cursor-not-allowed"
                             }`}
                         onClick={handleForward}
                         disabled={selectedUsers.length === 0}
-                        whileHover={selectedUsers.length > 0 ? { scale: 1.02, y: -1 } : {}}
-                        whileTap={selectedUsers.length > 0 ? { scale: 0.98 } : {}}
+                        whileTap={selectedUsers.length > 0 ? { scale: 0.97 } : {}}
                     >
                         <Forward className="w-4 h-4" />
-                        Forward {selectedUsers.length > 0 && (
-                            <motion.span
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs"
-                            >
-                                {selectedUsers.length}
-                            </motion.span>
-                        )}
+                        Forward {selectedUsers.length > 0 && `(${selectedUsers.length})`}
                     </motion.button>
-                </motion.div>
+                </div>
             </motion.div>
         </motion.div>
     );
 }
 
-// Double-tick read indicator component
-export function MessageReadIndicator({ isRead, isOwn }) {
-    if (!isOwn) return null;
+// Reply Preview Component (for showing what you're replying to)
+export function ReplyPreview({ message, onCancel }) {
+    if (!message) return null;
 
     return (
         <motion.div
-            className="inline-flex ml-1"
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
+            className="flex items-center gap-2 p-2 mx-3 mb-2 bg-slate-800/70 rounded-lg border-l-4 border-cyan-500"
+            initial={{ opacity: 0, y: 10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: 10, height: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
         >
-            <CheckCheck
-                className={`w-4 h-4 ${isRead ? 'text-cyan-400' : 'text-slate-400/60'}`}
-            />
+            <CornerUpLeft className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+                <p className="text-xs text-cyan-400 font-medium">Replying to</p>
+                <p className="text-xs text-slate-400 truncate">
+                    {message.text || (message.image ? "📷 Image" : "Message")}
+                </p>
+            </div>
+            <motion.button
+                onClick={onCancel}
+                className="p-1 hover:bg-slate-700/50 rounded-full transition-colors"
+                whileTap={{ scale: 0.9 }}
+            >
+                <X className="w-4 h-4 text-slate-400" />
+            </motion.button>
         </motion.div>
     );
 }

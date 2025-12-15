@@ -20,9 +20,24 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
     isEdited: {
       type: Boolean,
       default: false,
+    },
+    isDelivered: {
+      type: Boolean,
+      default: false,
+    },
+    isRead: {
+      type: Boolean,
+      default: false,
+    },
+    readAt: {
+      type: Date,
     },
     reactions: [
       {
@@ -42,4 +57,5 @@ const messageSchema = new mongoose.Schema(
 const Message = mongoose.model("Message", messageSchema);
 
 export default Message;
+
 

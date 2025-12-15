@@ -36,7 +36,7 @@ export const getMessagesByUserId = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, replyTo } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -53,21 +53,26 @@ export const sendMessage = async (req, res) => {
 
     let imageUrl;
     if (image) {
-      // upload base64 image to cloudinary
       const uploadResponse = await cloudinary.uploader.upload(image);
       imageUrl = uploadResponse.secure_url;
     }
+
+    // Check if receiver is online
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    const isReceiverOnline = !!receiverSocketId;
 
     const newMessage = new Message({
       senderId,
       receiverId,
       text,
       image: imageUrl,
+      replyTo: replyTo || null,
+      isDelivered: isReceiverOnline, // Mark as delivered if receiver is online
     });
 
     await newMessage.save();
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
+    // Send message to receiver if online
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
     }
@@ -200,6 +205,93 @@ export const reactToMessage = async (req, res) => {
   }
 };
 
+// Mark messages as read
+export const markMessagesAsRead = async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const readerId = req.user._id;
+
+    // Update all unread messages from sender to reader
+    const result = await Message.updateMany(
+      {
+        senderId,
+        receiverId: readerId,
+        isRead: false
+      },
+      {
+        isRead: true,
+        readAt: new Date()
+      }
+    );
+
+    // Get the updated message IDs to notify the sender
+    const updatedMessages = await Message.find({
+      senderId,
+      receiverId: readerId,
+      isRead: true
+    }).select('_id');
+
+    const messageIds = updatedMessages.map(m => m._id.toString());
+
+    // Notify sender via socket that messages were read
+    const senderSocketId = getReceiverSocketId(senderId);
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messagesRead", {
+        readerId: readerId.toString(),
+        messageIds
+      });
+    }
+
+    res.status(200).json({
+      message: "Messages marked as read",
+      count: result.modifiedCount
+    });
+  } catch (error) {
+    console.log("Error in markMessagesAsRead: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Get unread message count per user
+export const getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get unread message counts grouped by sender
+    const unreadCounts = await Message.aggregate([
+      {
+        $match: {
+          receiverId: userId,
+          isRead: false
+        }
+      },
+      {
+        $group: {
+          _id: "$senderId",
+          count: { $sum: 1 },
+          lastMessage: { $last: "$text" },
+          lastMessageTime: { $last: "$createdAt" }
+        }
+      }
+    ]);
+
+    // Convert to object for easy lookup
+    const unreadMap = {};
+    unreadCounts.forEach(item => {
+      unreadMap[item._id.toString()] = {
+        count: item.count,
+        lastMessage: item.lastMessage,
+        lastMessageTime: item.lastMessageTime
+      };
+    });
+
+    res.status(200).json(unreadMap);
+  } catch (error) {
+    console.log("Error in getUnreadCount: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getChatPartners = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
@@ -221,10 +313,35 @@ export const getChatPartners = async (req, res) => {
 
     const chatPartners = await User.find({ _id: { $in: chatPartnerIds } }).select("-password");
 
-    res.status(200).json(chatPartners);
+    // Get unread counts for each chat partner
+    const unreadCounts = await Message.aggregate([
+      {
+        $match: {
+          receiverId: loggedInUserId,
+          isRead: false,
+          senderId: { $in: chatPartners.map(p => p._id) }
+        }
+      },
+      {
+        $group: {
+          _id: "$senderId",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Attach unread count to each partner
+    const partnersWithUnread = chatPartners.map(partner => {
+      const unread = unreadCounts.find(u => u._id.toString() === partner._id.toString());
+      return {
+        ...partner.toObject(),
+        unreadCount: unread ? unread.count : 0
+      };
+    });
+
+    res.status(200).json(partnersWithUnread);
   } catch (error) {
     console.error("Error in getChatPartners: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
-

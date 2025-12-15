@@ -1,13 +1,15 @@
-import { ArrowLeftIcon, XIcon } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowLeftIcon, XIcon, Eye } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useChatStore } from "../store/useChatStore";
 import { useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 
 function ChatHeader() {
-  const { selectedUser, setSelectedUser, setShowMobileSidebar } = useChatStore();
+  const { selectedUser, setSelectedUser, setShowMobileSidebar, typingUsers, viewingUsers } = useChatStore();
   const { onlineUsers } = useAuthStore();
   const isOnline = onlineUsers.includes(selectedUser._id);
+  const isTyping = typingUsers[selectedUser._id];
+  const isViewingChat = viewingUsers[selectedUser._id];
 
   const handleBackToSidebar = () => {
     setShowMobileSidebar(true);
@@ -26,6 +28,21 @@ function ChatHeader() {
     // cleanup function
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [setSelectedUser, setShowMobileSidebar]);
+
+  // Get status text
+  const getStatusText = () => {
+    if (isTyping) return "typing...";
+    if (isViewingChat) return "viewing chat";
+    if (isOnline) return "Online";
+    return "Offline";
+  };
+
+  const getStatusColor = () => {
+    if (isTyping) return "text-cyan-400";
+    if (isViewingChat) return "text-purple-400";
+    if (isOnline) return "text-green-400";
+    return "text-slate-400";
+  };
 
   return (
     <motion.div
@@ -57,9 +74,42 @@ function ChatHeader() {
 
         <div>
           <h3 className="text-slate-200 font-medium text-sm md:text-base">{selectedUser.fullName}</h3>
-          <p className={`text-xs ${isOnline ? 'text-green-400' : 'text-slate-400'}`}>
-            {isOnline ? "Online" : "Offline"}
-          </p>
+
+          {/* Typing/Viewing/Online Status */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={getStatusText()}
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 5 }}
+              transition={{ duration: 0.15 }}
+              className={`text-xs flex items-center gap-1 ${getStatusColor()}`}
+            >
+              {isTyping && (
+                <span className="flex gap-0.5 mr-1">
+                  <motion.span
+                    className="w-1 h-1 bg-cyan-400 rounded-full"
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.5, delay: 0 }}
+                  />
+                  <motion.span
+                    className="w-1 h-1 bg-cyan-400 rounded-full"
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.5, delay: 0.1 }}
+                  />
+                  <motion.span
+                    className="w-1 h-1 bg-cyan-400 rounded-full"
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.5, delay: 0.2 }}
+                  />
+                </span>
+              )}
+              {isViewingChat && !isTyping && (
+                <Eye className="w-3 h-3 mr-0.5" />
+              )}
+              {getStatusText()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
