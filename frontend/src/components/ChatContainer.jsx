@@ -22,6 +22,7 @@ function ChatContainer() {
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   const [contextMenu, setContextMenu] = useState(null);
   const [editModal, setEditModal] = useState(null);
@@ -55,12 +56,17 @@ function ChatContainer() {
     const bubbleEl = e.currentTarget;
     const bubbleRect = bubbleEl.getBoundingClientRect();
     const isOwn = msg.senderId === authUser._id;
+
+    // Get the chat container bounds for proper positioning on desktop
+    const containerRect = chatContainerRef.current?.getBoundingClientRect();
+
     setContextMenu({
       message: msg,
       position: {
         x: isOwn ? bubbleRect.left : bubbleRect.right,
         y: bubbleRect.top + bubbleRect.height / 2,
         bubbleRect,
+        containerRect,
         isOwn
       }
     });
@@ -71,6 +77,10 @@ function ChatContainer() {
     const bubbleEl = e.currentTarget;
     const bubbleRect = bubbleEl.getBoundingClientRect();
     const isOwn = msg.senderId === authUser._id;
+
+    // Get the chat container bounds for proper positioning on desktop
+    const containerRect = chatContainerRef.current?.getBoundingClientRect();
+
     longPressTimer.current = setTimeout(() => {
       setContextMenu({
         message: msg,
@@ -78,6 +88,7 @@ function ChatContainer() {
           x: isOwn ? bubbleRect.left : bubbleRect.right,
           y: bubbleRect.top + bubbleRect.height / 2,
           bubbleRect,
+          containerRect,
           isOwn
         }
       });
@@ -111,7 +122,7 @@ function ChatContainer() {
   const getReplyMessage = (msg) => msg.replyTo ? messages.find(m => m._id === msg.replyTo) : null;
 
   return (
-    <>
+    <div ref={chatContainerRef} className="flex flex-col h-full w-full relative">
       <ChatHeader />
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 px-4 md:px-8 hide-scrollbar bg-slate-900/30">
         {messages.length > 0 && !isMessagesLoading ? (
@@ -240,7 +251,7 @@ function ChatContainer() {
       <AnimatePresence>
         {forwardModal && <ForwardMessageModal message={forwardModal} onForward={handleConfirmForward} onClose={() => setForwardModal(null)} />}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
 

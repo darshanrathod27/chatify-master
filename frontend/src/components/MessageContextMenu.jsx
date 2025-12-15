@@ -23,48 +23,67 @@ function MessageContextMenu({
     const [menuStyle, setMenuStyle] = useState({ top: 0, left: 0 });
 
     // Calculate position - DIRECTLY attached to the bubble
+    // Works correctly for both mobile (full-screen) and desktop (modal/dialog)
     useEffect(() => {
         const bubbleRect = position.bubbleRect;
+        const containerRect = position.containerRect;
         const menuWidth = 160;
         const menuHeight = 280;
 
         let left, top;
 
         if (bubbleRect) {
-            // Use bubbleRect to position menu right next to the message
+            // Determine bounds - use container if available (desktop), otherwise viewport (mobile)
+            const boundsLeft = containerRect ? containerRect.left : 0;
+            const boundsRight = containerRect ? containerRect.right : window.innerWidth;
+            const boundsTop = containerRect ? containerRect.top : 0;
+            const boundsBottom = containerRect ? containerRect.bottom : window.innerHeight;
+            const boundsWidth = boundsRight - boundsLeft;
+
             if (isOwnMessage) {
-                // Own message (right side) - put menu on LEFT
+                // Own message (right side) - put menu on LEFT of bubble
                 left = bubbleRect.left - menuWidth - 10;
                 // If not enough space on left, flip to right
-                if (left < 10) {
+                if (left < boundsLeft + 10) {
                     left = bubbleRect.right + 10;
                 }
+                // Still not enough space? Put it inside left edge
+                if (left + menuWidth > boundsRight - 10) {
+                    left = boundsRight - menuWidth - 10;
+                }
             } else {
-                // Other's message (left side) - put menu on RIGHT
+                // Other's message (left side) - put menu on RIGHT of bubble
                 left = bubbleRect.right + 10;
                 // If not enough space on right, flip to left
-                if (left + menuWidth > window.innerWidth - 10) {
+                if (left + menuWidth > boundsRight - 10) {
                     left = bubbleRect.left - menuWidth - 10;
+                }
+                // Still not enough space? Put it inside right edge
+                if (left < boundsLeft + 10) {
+                    left = boundsLeft + 10;
                 }
             }
 
-            // Align vertically with bubble top, slightly offset
+            // Align vertically with bubble top
             top = bubbleRect.top;
 
-            // If menu would go below screen, move it up
-            if (top + menuHeight > window.innerHeight - 20) {
-                top = window.innerHeight - menuHeight - 20;
+            // If menu would go below container/screen, move it up
+            if (top + menuHeight > boundsBottom - 20) {
+                top = boundsBottom - menuHeight - 20;
             }
-            // Don't go above screen
-            if (top < 20) top = 20;
+            // Don't go above container/screen
+            if (top < boundsTop + 20) {
+                top = boundsTop + 20;
+            }
+
+            // Final safety: ensure within bounds
+            left = Math.max(boundsLeft + 10, Math.min(left, boundsRight - menuWidth - 10));
+            top = Math.max(boundsTop + 10, Math.min(top, boundsBottom - menuHeight - 10));
         } else {
             // Fallback - shouldn't happen
             left = Math.max(10, Math.min(position.x, window.innerWidth - menuWidth - 10));
             top = Math.max(10, Math.min(position.y, window.innerHeight - menuHeight - 10));
         }
-
-        // Extra safety: ensure within bounds
-        left = Math.max(10, Math.min(left, window.innerWidth - menuWidth - 10));
 
         setMenuStyle({ top, left });
     }, [position, isOwnMessage]);
