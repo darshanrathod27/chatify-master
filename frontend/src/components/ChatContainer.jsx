@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -224,33 +225,39 @@ function ChatContainer() {
 
       <MessageInput replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
 
-      <AnimatePresence>
-        {contextMenu && (
-          <MessageContextMenu
-            message={contextMenu.message}
-            position={contextMenu.position}
-            onClose={closeContextMenu}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onReact={handleReact}
-            onForward={handleForward}
-            onReply={handleReply}
-            isOwnMessage={contextMenu.message.senderId === authUser._id}
-          />
-        )}
-      </AnimatePresence>
+      {/* Portal renders context menu and modals at body level to escape overflow:hidden */}
+      {createPortal(
+        <>
+          <AnimatePresence>
+            {contextMenu && (
+              <MessageContextMenu
+                message={contextMenu.message}
+                position={contextMenu.position}
+                onClose={closeContextMenu}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onReact={handleReact}
+                onForward={handleForward}
+                onReply={handleReply}
+                isOwnMessage={contextMenu.message.senderId === authUser._id}
+              />
+            )}
+          </AnimatePresence>
 
-      <AnimatePresence>
-        {editModal && <EditMessageModal message={editModal} onSave={handleSaveEdit} onClose={() => setEditModal(null)} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {editModal && <EditMessageModal message={editModal} onSave={handleSaveEdit} onClose={() => setEditModal(null)} />}
+          </AnimatePresence>
 
-      <AnimatePresence>
-        {deleteModal && <DeleteMessageModal message={deleteModal} onConfirm={handleConfirmDelete} onClose={() => setDeleteModal(null)} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {deleteModal && <DeleteMessageModal message={deleteModal} onConfirm={handleConfirmDelete} onClose={() => setDeleteModal(null)} />}
+          </AnimatePresence>
 
-      <AnimatePresence>
-        {forwardModal && <ForwardMessageModal message={forwardModal} onForward={handleConfirmForward} onClose={() => setForwardModal(null)} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {forwardModal && <ForwardMessageModal message={forwardModal} onForward={handleConfirmForward} onClose={() => setForwardModal(null)} />}
+          </AnimatePresence>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

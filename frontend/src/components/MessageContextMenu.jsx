@@ -149,7 +149,7 @@ function MessageContextMenu({
     return (
         <motion.div
             ref={menuRef}
-            className="fixed z-[999] bg-slate-800/95 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden"
+            className="fixed z-[9999] bg-slate-800/95 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden"
             style={{ top: menuStyle.top, left: menuStyle.left, minWidth: 150 }}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
